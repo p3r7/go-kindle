@@ -24,7 +24,7 @@ const (
 
 	SCREEN_ROT = 90
 
-	TEXT = "Hello, how are you?"
+	DEFAULT_TEXT = "Hello, how are you?"
 
 	FILE_EXT = "png"
 )
@@ -35,17 +35,18 @@ const (
 var (
 	isKindle = false
 	fontPath = ""
+	text     = ""
 )
 
 // ------------------------------------------------------------------------
 
 func init() {
 	isKindle = isCurrHostKindle()
-	if isKindle {
-		fmt.Println("Is kindle!")
+
+	if len(os.Args) < 2 || os.Args[1] == "" {
+		text = DEFAULT_TEXT
 	} else {
-		fmt.Println("Kindle detection failed, forcing")
-		isKindle = true
+		text = os.Args[1]
 	}
 
 	fonts := []string{
@@ -53,7 +54,6 @@ func init() {
 		KINDLE_FONT_DIR + "Helvetica_LT_65_Medium.ttf",
 		"/usr/share/fonts/truetype/ubuntu/Ubuntu-M.ttf",
 	}
-
 	for _, fp := range fonts {
 		if _, err := os.Stat(fp); err == nil {
 			fontPath = fp
@@ -66,7 +66,7 @@ func main() {
 	if fontPath == "" {
 		checkErr(fmt.Errorf("No font found on system"))
 	}
-	fmt.Println("FontPath: " + fontPath)
+	// fmt.Println("FontPath: " + fontPath)
 
 	conf := text2img.Params{
 		// NB: swapping H/W as we'll display rotated 90 degrees
@@ -88,7 +88,7 @@ func main() {
 	d, err := text2img.NewDrawer(conf)
 	checkErr(err)
 
-	img, err := d.Draw(TEXT)
+	img, err := d.Draw(text)
 	checkErr(err)
 
 	// flippedImg := img
