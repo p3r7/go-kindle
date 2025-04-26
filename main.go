@@ -5,7 +5,9 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"image/png"
 	"os"
+	"os/exec"
 
 	"github.com/disintegration/imaging"
 	"github.com/p3r7/text2img"
@@ -21,20 +23,31 @@ const (
 
 	SCREEN_ROT = 90
 
-	TEXT = "Hello, how are you?"
+	TEXT     = "Hello, how are you?"
+	FILE_EXT = "png"
 )
 
 // ------------------------------------------------------------------------
 // STATE
 
-var fontPath = ""
+var (
+	isKindle = false
+	fontPath = ""
+)
 
 // ------------------------------------------------------------------------
 
 func init() {
+	isKindle = isCurrHostKindle()
+	if isKindle {
+		fmt.Println("Is kindle!")
+	} else {
+		fmt.Println("Kindle detection failed, forcing")
+		isKindle = true
+	}
 
 	fonts := []string{
-		KINDLE_FONT_DIR + "Kindle_MonospacedSymbol.ttf",
+		KINDLE_FONT_DIR + "Helvetica_LT_65_Medium.ttf",
 		"/usr/share/fonts/truetype/ubuntu/Ubuntu-M.ttf",
 	}
 
@@ -50,6 +63,7 @@ func main() {
 	if fontPath == "" {
 		checkErr(fmt.Errorf("No font found on system"))
 	}
+	fmt.Println("FontPath: " + fontPath)
 
 	conf := text2img.Params{
 		// NB: swapping H/W as we'll display rotated 90 degrees
@@ -57,7 +71,7 @@ func main() {
 		Height:          KINDLE_H,
 		FontPath:        fontPath,
 		BackgroundColor: Hex("#fff"),
-		TextColor:       Hex("#003d47"),
+		TextColor:       Hex("#000"),
 		// TextColor: color.RGBA{0, 0, 0, 0},
 		// TextColor: color.RGBA{255, 255, 255, 0},
 	}
@@ -83,12 +97,36 @@ func main() {
 		img = (*image.RGBA)(imaging.Rotate180(img))
 	}
 
-	file, err := os.Create("test.jpg")
+	// NB: `imaging.Grayscale` results in a grayscale looking "8-bit/color RGB" file and not an actual "8-bit grayscale"
+	// that's why we spin our own fn
+	// grayImg := imaging.Grayscale(img)
+	grayImg := Grayscale(img)
+
+	outFp := "test." + FILE_EXT
+	if isKindle {
+		outFp = "/dev/shm/test." + FILE_EXT
+	}
+
+	file, err := os.Create(outFp)
 	checkErr(err)
 	defer file.Close()
 
-	err = jpeg.Encode(file, img, &jpeg.Options{Quality: 100})
-	checkErr(err)
+	switch {
+	case FILE_EXT == "png":
+		err = png.Encode(file, grayImg)
+		checkErr(err)
+	case FILE_EXT == "jpg":
+		err = jpeg.Encode(file, grayImg, &jpeg.Options{Quality: 100})
+		checkErr(err)
+	default:
+		checkErr(fmt.Errorf("Unsupported out file extension: " + FILE_EXT))
+	}
+
+	if isKindle {
+		cmd := exec.Command("/usr/sbin/eips", "-g", outFp)
+		err = cmd.Run()
+		checkErr(err)
+	}
 }
 
 // ------------------------------------------------------------------------
@@ -115,4 +153,40 @@ func Hex(scol string) color.RGBA {
 		checkErr(fmt.Errorf("color: %v is not a hex-color", scol))
 	}
 	return color.RGBA{r * factor, g * factor, b * factor, 255}
+}
+
+func isCurrHostKindle() (ok bool) {
+	// NB: `os.Hostname()` returns an empty string on my k4
+	// likewise when calling /bin/hostname, even though it works in shell
+
+	if hn, err := exec.Command("/bin/hostname").Output(); err != nil {
+		fmt.Println("hn: " + string(hn))
+		return (string(hn) == "kindle")
+	} else {
+		checkErr(err)
+	}
+
+	// if hn, err := ioutil.ReadFile("/etc/hostname"); err != nil {
+	// 	fmt.Println("hn: " + string(hn))
+	// 	return (string(hn) == "kindle")
+	// } else {
+	// 	checkErr(err)
+	// }
+
+	return
+}
+
+func Grayscale(src *image.RGBA) *image.Gray {
+	bounds := src.Bounds()
+	gray := image.NewGray(bounds)
+
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			rgba := src.RGBAAt(x, y)
+			// Use standard luminance formula
+			lum := uint8((299*uint32(rgba.R) + 587*uint32(rgba.G) + 114*uint32(rgba.B)) / 1000)
+			gray.SetGray(x, y, color.Gray{Y: lum})
+		}
+	}
+	return gray
 }
