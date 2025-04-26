@@ -17,13 +17,15 @@ import (
 // CONST
 
 const (
-	KINDLE_FONT_DIR = "/usr/java/lib/fonts/"
-	KINDLE_H        = 800
-	KINDLE_W        = 600
+	KINDLE_FONT_DIR      = "/usr/java/lib/fonts/"
+	KINDLE_USER_FONT_DIR = "/mnt/us/fonts/"
+	KINDLE_H             = 800
+	KINDLE_W             = 600
 
 	SCREEN_ROT = 90
 
-	TEXT     = "Hello, how are you?"
+	TEXT = "Hello, how are you?"
+
 	FILE_EXT = "png"
 )
 
@@ -47,6 +49,7 @@ func init() {
 	}
 
 	fonts := []string{
+		KINDLE_USER_FONT_DIR + "NotoSans-Regular.ttf",
 		KINDLE_FONT_DIR + "Helvetica_LT_65_Medium.ttf",
 		"/usr/share/fonts/truetype/ubuntu/Ubuntu-M.ttf",
 	}
@@ -130,6 +133,15 @@ func main() {
 }
 
 // ------------------------------------------------------------------------
+// UTILS
+
+func isCurrHostKindle() (ok bool) {
+	if hn, err := os.Hostname(); err == nil {
+		return (string(hn) == "kindle")
+	}
+
+	return
+}
 
 func checkErr(err error) {
 	if err != nil {
@@ -138,41 +150,11 @@ func checkErr(err error) {
 	}
 }
 
-func Hex(scol string) color.RGBA {
-	format := "#%02x%02x%02x"
-	factor := uint8(1)
-	if len(scol) == 4 {
-		format = "#%1x%1x%1x"
-		factor = uint8(17)
-	}
+// ------------------------------------------------------------------------
+// UTILS - COLORS
 
-	var r, g, b uint8
-	n, err := fmt.Sscanf(scol, format, &r, &g, &b)
-	checkErr(err)
-	if n != 3 {
-		checkErr(fmt.Errorf("color: %v is not a hex-color", scol))
-	}
-	return color.RGBA{r * factor, g * factor, b * factor, 255}
-}
-
-func isCurrHostKindle() (ok bool) {
-	// NB: `os.Hostname()` returns an empty string on my k4
-	// likewise when calling /bin/hostname, even though it works in shell
-
-	if hn, err := exec.Command("/bin/hostname").Output(); err != nil {
-		fmt.Println("hn: " + string(hn))
-		return (string(hn) == "kindle")
-	} else {
-		checkErr(err)
-	}
-
-	// if hn, err := ioutil.ReadFile("/etc/hostname"); err != nil {
-	// 	fmt.Println("hn: " + string(hn))
-	// 	return (string(hn) == "kindle")
-	// } else {
-	// 	checkErr(err)
-	// }
-
+func Hex(scol string) (col color.RGBA) {
+	col, _ = text2img.Hex(scol)
 	return
 }
 
