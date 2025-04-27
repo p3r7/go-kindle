@@ -10,7 +10,8 @@ import (
 	"os/exec"
 
 	"github.com/disintegration/imaging"
-	"github.com/p3r7/text2img"
+
+	"github.com/p3r7/go-kindle/text2img"
 )
 
 // ------------------------------------------------------------------------
