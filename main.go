@@ -1,15 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"io/ioutil"
 	"os"
 	"os/exec"
 
 	"github.com/disintegration/imaging"
+
+	// text "github.com/hajimehoshi/ebiten/v2/text/v2"
+	text "github.com/p3r7/go-kindle/text"
+	"golang.org/x/text/language"
 
 	"github.com/p3r7/go-kindle/text2img"
 )
@@ -36,7 +42,7 @@ const (
 var (
 	isKindle = false
 	fontPath = ""
-	text     = ""
+	txt      = ""
 )
 
 // ------------------------------------------------------------------------
@@ -45,9 +51,9 @@ func init() {
 	isKindle = isCurrHostKindle()
 
 	if len(os.Args) < 2 || os.Args[1] == "" {
-		text = DEFAULT_TEXT
+		txt = DEFAULT_TEXT
 	} else {
-		text = os.Args[1]
+		txt = os.Args[1]
 	}
 
 	fonts := []string{
@@ -63,7 +69,27 @@ func init() {
 	}
 }
 
+// type Game struct {
+// 	showOrigins bool
+// }
+
+// func (g *Game) Draw(screen *ebiten.Image) {
+// }
+
+// func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
+// 	// return screenWidth, screenHeight
+// 	return 600, 800
+// }
+
+// func (g *Game) Update() error {
+// 	return nil
+// }
+
 func main() {
+	// if err := ebiten.RunGame(&Game{}); err != nil {
+	// 	log.Fatal(err)
+	// }
+
 	if fontPath == "" {
 		checkErr(fmt.Errorf("No font found on system"))
 	}
@@ -86,11 +112,47 @@ func main() {
 		conf.Height = KINDLE_W
 	}
 
-	d, err := text2img.NewDrawer(conf)
+	mongolianFontPath := "./fonts/NotoSansMongolian-Regular.ttf"
+	if isKindle {
+		mongolianFontPath = KINDLE_USER_FONT_DIR + "NotoSansMongolian-Regular.ttf"
+	}
+	mongolianTTF, err := ioutil.ReadFile(mongolianFontPath)
 	checkErr(err)
+	mongolianFaceSource, err := text.NewGoTextFaceSource(bytes.NewReader(mongolianTTF))
+	checkErr(err)
+	const mongolianText = "ᠬᠦᠮᠦᠨ ᠪᠦᠷ ᠲᠥᠷᠥᠵᠦ ᠮᠡᠨᠳᠡᠯᠡᠬᠦ\nᠡᠷᠬᠡ ᠴᠢᠯᠥᠭᠡ ᠲᠡᠢ᠂ ᠠᠳᠠᠯᠢᠬᠠᠨ"
+	f := &text.GoTextFace{
+		Source:    mongolianFaceSource,
+		Direction: text.DirectionTopToBottomAndLeftToRight,
+		Size:      55,
+		Language:  language.Mongolian,
+		// language.Mongolian.Script() returns "Cyrl" (Cyrillic), but we want Mongolian script here.
+		Script: language.MustParseScript("Mong"),
+	}
+	_ = f
 
-	img, err := d.Draw(text)
-	checkErr(err)
+	eimgRect := image.Rect(0, 0, conf.Width, conf.Height)
+	eimg := image.NewRGBA(eimgRect)
+	// eimg := ebiten.NewImage(KINDLE_H, KINDLE_W)
+
+	// const lineSpacing = 48
+	const lineSpacing = 64
+	// x, y := 20, 290
+	// w, h := text.Measure(mongolianText, f, lineSpacing)
+	op := &text.DrawOptions{}
+	// op.GeoM.Translate(float64(x), float64(y))
+	op.LineSpacing = lineSpacing
+	// NB: does not fail
+	text.Draw(eimg, mongolianText, f, op)
+
+	// img, err := ebitenImageToRGBA(eimg)
+	// checkErr(err)
+	img := eimg
+
+	// d, err := text2img.NewDrawer(conf)
+	// checkErr(err)
+	// img, err := d.Draw(txt)
+	// checkErr(err)
 
 	// flippedImg := img
 	if SCREEN_ROT == 90 {
@@ -150,6 +212,44 @@ func checkErr(err error) {
 		os.Exit(1)
 	}
 }
+
+// ------------------------------------------------------------------------
+// UTILS - IMG
+
+// func ebitenImageToRGBA(i *ebiten.Image) (i2 *image.RGBA, err error) {
+// 	// rect := image.Rect(0, 0, i.width, i.height)
+
+// 	w := i.Bounds().Dx()
+// 	h := i.Bounds().Dy()
+
+// 	pix := make([]byte, 4*w*h)
+// 	// err = i.ReadPixels(ui.Get().GraphicsDriverForTesting(), []graphicsdriver.PixelsArgs{
+// 	// 	{
+// 	// 		Pixels: pix,
+// 	// 		Region: image.Rect(0, 0, i.width, i.height),
+// 	// 	},
+// 	// })
+// 	// if err != nil {
+// 	// 	return
+// 	// }
+// 	i.ReadPixels(pix)
+
+// 	// BG
+// 	for i := 0; i < len(pix)/4; i++ {
+// 		pix[4*i+3] = 0xff
+// 	}
+
+// 	// i2 = ().SubImage(rect)
+
+// 	i2 = &image.RGBA{
+// 		Pix:    pix,
+// 		Stride: 4 * w,
+// 		Rect:   image.Rect(0, 0, w, h),
+// 	}
+// 	// .SubImage(rect)
+
+// 	return
+// }
 
 // ------------------------------------------------------------------------
 // UTILS - COLORS
